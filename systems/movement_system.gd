@@ -8,11 +8,15 @@ const DIRECTIONS: Array[Vector2i] = [
 	Vector2i(1, 0),
 	Vector2i(-1, 0),
 	Vector2i(0, 1),
-	Vector2i(0, -1)
+	Vector2i(0, -1),
+	Vector2i(1, 1),
+	Vector2i(1, -1),
+	Vector2i(-1, 1),
+	Vector2i(-1, -1)
 ]
 
 @export_category("Movement")
-@export var movement_range_cells: int = 6
+@export var movement_speed_feet: int = 30
 
 
 @export_category("Visual")
@@ -73,60 +77,104 @@ func _process(_delta: float) -> void:
 
 	_update_reachable_cells(character.grid_position)
 
-	if not debug_reported:
-		print("MovementSystem: personagem selecionado = ", character.name)
-		print("MovementSystem: grid_position = ", character.grid_position)
-		print("MovementSystem: células alcançáveis = ", reachable_cells.size())
-		debug_reported = true
-
 	_update_destination_preview()
 
 func _update_reachable_cells(origin: Vector2i) -> void:
-	var new_cells: Array[Vector2i] = []
-	var visited: Dictionary = {}
-	var queue: Array[Vector2i] = []
+	var character := selection_system.selected_character
 
-	queue.append(origin)
-	visited[origin] = 0
+	if character == null:
+		reachable_cells.clear()
+		_rebuild_reachable_visuals()
+		return
 
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
-		var current_distance: int = visited[current]
+	var distances: Dictionary = {}
+	var states: Array[Vector3i] = []
 
-		if current_distance > movement_range_cells:
-			continue
+	var start_state := Vector3i(origin.x, origin.y, 0)
 
-		new_cells.append(current)
+	distances[start_state] = 0
+	states.append(start_state)
+
+	while not states.is_empty():
+		var best_index := 0
+		var best_state: Vector3i = states[0]
+
+		for i in range(1, states.size()):
+			if distances[states[i]] < distances[best_state]:
+				best_index = i
+				best_state = states[i]
+
+		states.remove_at(best_index)
+
+		var current := Vector2i(
+			best_state.x,
+			best_state.y
+		)
+
+		var current_cost: int = distances[best_state]
+		var diagonal_parity: int = best_state.z
 
 		for direction in DIRECTIONS:
-			var next_cell: Vector2i = current + direction
+			var next_cell := current + direction
 
 			if not grid_system.is_inside_grid(next_cell):
 				continue
 
-			if grid_system.is_cell_blocked(next_cell):
+			if not can_pass_through_cell(
+				next_cell,
+				character
+			):
 				continue
 
-			var character := selection_system.selected_character
-
-			if character == null:
+			if not _can_move_diagonally(
+				current,
+				next_cell,
+			):
 				continue
 
-			if not can_pass_through_cell(next_cell, character):
+			var is_diagonal := (
+				direction.x != 0
+				and direction.y != 0
+			)
+
+			var movement_cost := 5
+			var next_parity := diagonal_parity
+
+			if is_diagonal:
+				if diagonal_parity == 0:
+					movement_cost = 5
+				else:
+					movement_cost = 10
+
+				next_parity = 1 - diagonal_parity
+
+			var new_cost := current_cost + movement_cost
+
+			if new_cost > movement_speed_feet:
 				continue
-				
-			if visited.has(next_cell):
-				continue
 
-			var next_distance: int = current_distance + 1
+			var next_state := Vector3i(
+				next_cell.x,
+				next_cell.y,
+				next_parity
+			)
 
-			if next_distance > movement_range_cells:
-				continue
+			if not distances.has(next_state):
+				distances[next_state] = new_cost
+				states.append(next_state)
+			elif new_cost < distances[next_state]:
+				distances[next_state] = new_cost
 
-			visited[next_cell] = next_distance
-			queue.append(next_cell)
+	reachable_cells.clear()
 
-	reachable_cells = new_cells
+	for state in distances.keys():
+		var cell := Vector2i(
+			state.x,
+			state.y
+		)
+
+		if not reachable_cells.has(cell):
+			reachable_cells.append(cell)
 
 	_rebuild_reachable_visuals()
 
@@ -222,50 +270,123 @@ func _find_path(
 	origin: Vector2i,
 	destination: Vector2i
 ) -> Array[Vector2i]:
-	var queue: Array[Vector2i] = []
-	var came_from: Dictionary = {}
-	var visited: Dictionary = {}
-
 	var character := selection_system.selected_character
 
 	if character == null:
 		return []
 
-	queue.append(origin)
-	visited[origin] = true
-	came_from[origin] = origin
+	var distances: Dictionary = {}
+	var came_from: Dictionary = {}
+	var states: Array[Vector3i] = []
 
-	while not queue.is_empty():
-		var current: Vector2i = queue.pop_front()
+	var start_state := Vector3i(
+		origin.x,
+		origin.y,
+		0
+	)
+
+	distances[start_state] = 0
+	came_from[start_state] = start_state
+	states.append(start_state)
+
+	var destination_state := Vector3i(
+		destination.x,
+		destination.y,
+		0
+	)
+
+	while not states.is_empty():
+		var best_index := 0
+		var best_state: Vector3i = states[0]
+
+		for i in range(1, states.size()):
+			if distances[states[i]] < distances[best_state]:
+				best_index = i
+				best_state = states[i]
+
+		states.remove_at(best_index)
+
+		var current := Vector2i(
+			best_state.x,
+			best_state.y
+		)
+
+		var current_cost: int = distances[best_state]
+		var diagonal_parity: int = best_state.z
 
 		if current == destination:
+			destination_state = best_state
 			break
 
 		for direction in DIRECTIONS:
-			var next_cell: Vector2i = current + direction
+			var next_cell := current + direction
 
 			if not grid_system.is_inside_grid(next_cell):
 				continue
 
-			if visited.has(next_cell):
+			if not can_pass_through_cell(
+				next_cell,
+				character
+			):
 				continue
 
-			if not can_pass_through_cell(next_cell, character):
+			if not _can_move_diagonally(
+				current,
+				next_cell,
+			):
 				continue
 
-			visited[next_cell] = true
-			came_from[next_cell] = current
-			queue.append(next_cell)
+			var is_diagonal := (
+				direction.x != 0
+				and direction.y != 0
+			)
 
-	if not visited.has(destination):
+			var movement_cost := 5
+			var next_parity := diagonal_parity
+
+			if is_diagonal:
+				if diagonal_parity == 0:
+					movement_cost = 5
+				else:
+					movement_cost = 10
+
+				next_parity = 1 - diagonal_parity
+
+			var new_cost := current_cost + movement_cost
+
+			if new_cost > movement_speed_feet:
+				continue
+
+			var next_state := Vector3i(
+				next_cell.x,
+				next_cell.y,
+				next_parity
+			)
+
+			if not distances.has(next_state):
+				distances[next_state] = new_cost
+				came_from[next_state] = best_state
+				states.append(next_state)
+
+			elif new_cost < distances[next_state]:
+				distances[next_state] = new_cost
+				came_from[next_state] = best_state
+
+	if not distances.has(destination_state):
 		return []
 
 	var path: Array[Vector2i] = []
-	var current: Vector2i = destination
+	var current_state: Vector3i = destination_state
 
-	while current != origin:
-		path.push_front(current)
-		current = came_from[current]
+	while current_state != start_state:
+		path.push_front(
+			Vector2i(
+				current_state.x,
+				current_state.y
+			)
+		)
+
+		current_state = came_from[current_state]
 
 	return path
 	
@@ -438,3 +559,36 @@ func can_end_movement_on_cell(
 		return true
 
 	return false
+	
+func _can_move_diagonally(
+	from_cell: Vector2i,
+	to_cell: Vector2i
+) -> bool:
+	var difference := to_cell - from_cell
+
+	if difference.x == 0 or difference.y == 0:
+		return true
+
+	var horizontal_cell := Vector2i(
+		to_cell.x,
+		from_cell.y
+	)
+
+	var vertical_cell := Vector2i(
+		from_cell.x,
+		to_cell.y
+	)
+
+	if not grid_system.is_inside_grid(horizontal_cell):
+		return false
+
+	if not grid_system.is_inside_grid(vertical_cell):
+		return false
+
+	if grid_system.is_cell_blocked(horizontal_cell):
+		return false
+
+	if grid_system.is_cell_blocked(vertical_cell):
+		return false
+
+	return true
