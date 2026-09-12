@@ -4,6 +4,12 @@ class_name MovementSystem
 
 const CELL_SIZE: float = 1.524
 
+const DIRECTIONS: Array[Vector2i] = [
+	Vector2i(1, 0),
+	Vector2i(-1, 0),
+	Vector2i(0, 1),
+	Vector2i(0, -1)
+]
 
 @export_category("Movement")
 @export var movement_range_cells: int = 6
@@ -56,7 +62,7 @@ func _process(_delta: float) -> void:
 		return
 
 	var character := selection_system.selected_character
-	
+
 	if character != null and character.is_moving:
 		clear_preview()
 		return
@@ -77,29 +83,52 @@ func _process(_delta: float) -> void:
 
 func _update_reachable_cells(origin: Vector2i) -> void:
 	var new_cells: Array[Vector2i] = []
+	var visited: Dictionary = {}
+	var queue: Array[Vector2i] = []
 
-	for x in range(
-		origin.x - movement_range_cells,
-		origin.x + movement_range_cells + 1
-	):
-		for y in range(
-			origin.y - movement_range_cells,
-			origin.y + movement_range_cells + 1
-		):
-			var cell := Vector2i(x, y)
+	queue.append(origin)
+	visited[origin] = 0
 
-			if not grid_system.is_inside_grid(cell):
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+		var current_distance: int = visited[current]
+
+		if current_distance > movement_range_cells:
+			continue
+
+		new_cells.append(current)
+
+		for direction in DIRECTIONS:
+			var next_cell: Vector2i = current + direction
+
+			if not grid_system.is_inside_grid(next_cell):
 				continue
 
-			var distance: int = abs(cell.x - origin.x) + abs(cell.y - origin.y)
+			if grid_system.is_cell_blocked(next_cell):
+				continue
 
-			if distance <= movement_range_cells:
-				new_cells.append(cell)
+			var character := selection_system.selected_character
+
+			if character == null:
+				continue
+
+			if not can_pass_through_cell(next_cell, character):
+				continue
+				
+			if visited.has(next_cell):
+				continue
+
+			var next_distance: int = current_distance + 1
+
+			if next_distance > movement_range_cells:
+				continue
+
+			visited[next_cell] = next_distance
+			queue.append(next_cell)
 
 	reachable_cells = new_cells
 
 	_rebuild_reachable_visuals()
-
 
 func _rebuild_reachable_visuals() -> void:
 	_clear_visual_dictionary(reachable_visuals)
@@ -154,7 +183,9 @@ func _update_destination_preview() -> void:
 		character.grid_position,
 		hovered_cell
 	)
-
+	
+	if path_cells.is_empty():
+		destination_visual.visible = false
 
 func _build_path(
 	origin: Vector2i,
@@ -162,23 +193,15 @@ func _build_path(
 ) -> void:
 	_clear_path()
 
-	var current := origin
+	if origin == destination:
+		return
 
-	while current.x != destination.x:
-		if current.x < destination.x:
-			current.x += 1
-		else:
-			current.x -= 1
+	var path := _find_path(origin, destination)
 
-		path_cells.append(current)
+	if path.is_empty():
+		return
 
-	while current.y != destination.y:
-		if current.y < destination.y:
-			current.y += 1
-		else:
-			current.y -= 1
-
-		path_cells.append(current)
+	path_cells.append_array(path)
 
 	for cell in path_cells:
 		if cell == destination:
@@ -188,11 +211,64 @@ func _build_path(
 			Color(0.3, 0.7, 0.9, path_alpha)
 		)
 
-		visual.position = grid_system.grid_to_world(cell) + Vector3(0.0, 0.028, 0.0)
+		visual.position = (
+			grid_system.grid_to_world(cell)
+			+ Vector3(0.0, 0.028, 0.0)
+		)
 
 		path_visuals[cell] = visual
 
+func _find_path(
+	origin: Vector2i,
+	destination: Vector2i
+) -> Array[Vector2i]:
+	var queue: Array[Vector2i] = []
+	var came_from: Dictionary = {}
+	var visited: Dictionary = {}
 
+	var character := selection_system.selected_character
+
+	if character == null:
+		return []
+
+	queue.append(origin)
+	visited[origin] = true
+	came_from[origin] = origin
+
+	while not queue.is_empty():
+		var current: Vector2i = queue.pop_front()
+
+		if current == destination:
+			break
+
+		for direction in DIRECTIONS:
+			var next_cell: Vector2i = current + direction
+
+			if not grid_system.is_inside_grid(next_cell):
+				continue
+
+			if visited.has(next_cell):
+				continue
+
+			if not can_pass_through_cell(next_cell, character):
+				continue
+
+			visited[next_cell] = true
+			came_from[next_cell] = current
+			queue.append(next_cell)
+
+	if not visited.has(destination):
+		return []
+
+	var path: Array[Vector2i] = []
+	var current: Vector2i = destination
+
+	while current != origin:
+		path.push_front(current)
+		current = came_from[current]
+
+	return path
+	
 func _create_destination_visual() -> void:
 	destination_visual = _create_cell_visual(
 		Color(0.35, 0.75, 1.0, destination_alpha)
@@ -267,9 +343,15 @@ func try_move_to_cell(cell: Vector2i) -> bool:
 	if not grid_system.is_inside_grid(cell):
 		return false
 
+	if grid_system.is_cell_blocked(cell):
+		return false
+		
+	if not can_end_movement_on_cell(cell, character):
+		return false
+		
 	if not reachable_cells.has(cell):
 		return false
-
+		
 	if cell == character.grid_position:
 		return false
 
@@ -289,3 +371,70 @@ func try_move_to_cell(cell: Vector2i) -> bool:
 	character.move_along_path(move_path)
 
 	return true
+
+func can_pass_through_cell(
+	cell: Vector2i,
+	moving_character: CharacterEntity
+) -> bool:
+	if not grid_system.is_inside_grid(cell):
+		return false
+
+	if grid_system.is_cell_blocked(cell):
+		return false
+
+	if not grid_system.is_cell_occupied(cell):
+		return true
+
+	var occupant := grid_system.get_character_at_cell(cell)
+
+	if occupant == null:
+		return true
+
+	if occupant == moving_character:
+		return true
+
+	# Um aliado pode ser atravessado.
+	if occupant.faction == moving_character.faction:
+		return true
+
+	# Um inimigo vivo normalmente não pode ser atravessado.
+	if occupant.is_alive and not occupant.is_helpless:
+		return false
+
+	# Um inimigo indefeso pode ser atravessado.
+	if occupant.is_helpless:
+		return true
+
+	# Cadáver não é tratado como criatura viva.
+	if not occupant.is_alive:
+		return true
+
+	return false
+	
+func can_end_movement_on_cell(
+	cell: Vector2i,
+	moving_character: CharacterEntity
+) -> bool:
+	if not grid_system.is_inside_grid(cell):
+		return false
+
+	if grid_system.is_cell_blocked(cell):
+		return false
+
+	if not grid_system.is_cell_occupied(cell):
+		return true
+
+	var occupant := grid_system.get_character_at_cell(cell)
+
+	if occupant == null:
+		return true
+
+	if occupant == moving_character:
+		return false
+
+	# Pela regra básica, não terminamos no mesmo espaço
+	# que outra criatura, salvo se ela estiver helpless.
+	if occupant.is_helpless:
+		return true
+
+	return false

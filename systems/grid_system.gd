@@ -1,9 +1,7 @@
 extends Node3D
 class_name GridSystem
 
-
 const CELL_SIZE: float = 1.524
-
 
 @export_category("Grid")
 @export var grid_width: int = 26
@@ -13,12 +11,12 @@ const CELL_SIZE: float = 1.524
 @export var line_height: float = 0.015
 @export var show_grid: bool = true
 
-
 var selected_cell: Vector2i = Vector2i(-1, -1)
 var selection_visual: MeshInstance3D
-
 var hovered_cell: Vector2i = Vector2i(-1, -1)
 var hover_visual: MeshInstance3D
+var blocked_cells: Dictionary = {}
+var occupied_cells: Dictionary = {}
 
 func _ready() -> void:
 	add_to_group("grid_system")
@@ -37,7 +35,6 @@ func world_to_grid(world_position: Vector3) -> Vector2i:
 		floori(local_position.z / CELL_SIZE)
 	)
 
-
 func grid_to_world(grid_position: Vector2i) -> Vector3:
 	var local_position := Vector3(
 		(grid_position.x + 0.5) * CELL_SIZE,
@@ -47,7 +44,6 @@ func grid_to_world(grid_position: Vector2i) -> Vector3:
 
 	return to_global(local_position)
 
-
 func is_inside_grid(grid_position: Vector2i) -> bool:
 	return (
 		grid_position.x >= 0
@@ -56,12 +52,10 @@ func is_inside_grid(grid_position: Vector2i) -> bool:
 		and grid_position.y < grid_height
 	)
 
-
 func select_cell(cell: Vector2i) -> void:
 	selected_cell = cell
 
 	_update_selection_visual()
-
 
 func clear_selection() -> void:
 	selected_cell = Vector2i(-1, -1)
@@ -217,3 +211,56 @@ func _create_hover_visual() -> void:
 	hover_visual.visible = false
 
 	add_child(hover_visual)
+func is_cell_blocked(cell: Vector2i) -> bool:
+	return blocked_cells.has(cell)
+
+
+func set_cell_blocked(cell: Vector2i, blocked: bool = true) -> void:
+	if not is_inside_grid(cell):
+		return
+
+	if blocked:
+		blocked_cells[cell] = true
+	else:
+		blocked_cells.erase(cell)
+
+
+func clear_blocked_cells() -> void:
+	blocked_cells.clear()
+
+
+func can_walk(cell: Vector2i) -> bool:
+	if not is_inside_grid(cell):
+		return false
+
+	if is_cell_blocked(cell):
+		return false
+
+	return true
+
+func is_cell_occupied(cell: Vector2i) -> bool:
+	return occupied_cells.has(cell)
+
+
+func get_character_at_cell(cell: Vector2i) -> CharacterEntity:
+	if not occupied_cells.has(cell):
+		return null
+
+	return occupied_cells[cell] as CharacterEntity
+
+
+func set_cell_occupied(
+	cell: Vector2i,
+	character: CharacterEntity
+) -> void:
+	if not is_inside_grid(cell):
+		return
+
+	if character == null:
+		return
+
+	occupied_cells[cell] = character
+
+
+func clear_cell_occupied(cell: Vector2i) -> void:
+	occupied_cells.erase(cell)

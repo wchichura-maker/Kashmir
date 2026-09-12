@@ -3,6 +3,10 @@ class_name CharacterEntity
 
 @export_category("Grid")
 @export var grid_position: Vector2i = Vector2i(13, 13)
+@export_category("Combat")
+@export_enum("Ally", "Enemy") var faction: String = "Ally"
+@export var is_alive: bool = true
+@export var is_helpless: bool = false
 
 @export_category("Movement")
 @export var move_step_duration: float = 0.12
@@ -37,6 +41,11 @@ func _sync_from_grid() -> void:
 	world_position = grid_system.grid_to_world(grid_position)
 	global_position = world_position
 
+	grid_system.set_cell_occupied(
+		grid_position,
+		self
+	)
+
 
 func move_along_path(path: Array[Vector2i]) -> void:
 	if is_moving:
@@ -62,7 +71,11 @@ func move_along_path(path: Array[Vector2i]) -> void:
 
 	# Posição visual atual do personagem.
 	var start_world := global_position
+	
+	var previous_cell := grid_position
 
+	grid_system.clear_cell_occupied(previous_cell)
+	
 	# Destino lógico.
 	var destination_cell: Vector2i = path[path.size() - 1]
 	var destination_world := grid_system.grid_to_world(destination_cell)
@@ -70,7 +83,12 @@ func move_along_path(path: Array[Vector2i]) -> void:
 	# A posição lógica passa imediatamente a ser o destino.
 	grid_position = destination_cell
 	world_position = destination_world
-
+	
+	grid_system.set_cell_occupied(
+		grid_position,
+		self
+	)
+	
 	# O corpo lógico fica no destino.
 	global_position = destination_world
 

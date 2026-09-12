@@ -83,7 +83,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-		var movement_system := get_tree().get_first_node_in_group(
+		var movement_system: MovementSystem = get_tree().get_first_node_in_group(
 			"movement_system"
 		) as MovementSystem
 
