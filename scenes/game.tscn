@@ -12,6 +12,7 @@
 [ext_resource type="Script" uid="uid://k2whgxysasr5" path="res://systems/audio_system.gd" id="10_vtaks"]
 [ext_resource type="AudioStream" uid="uid://dnjygh04c3j8x" path="res://audio/test_hearing.wav" id="11_kvpfn"]
 [ext_resource type="Script" uid="uid://cdp4b3co4asfb" path="res://systems/investigation_system.gd" id="12_dinhu"]
+[ext_resource type="Script" uid="uid://b5ilnbppbfe5w" path="res://systems/ai_system.gd" id="13_kvuet"]
 
 [sub_resource type="Environment" id="Environment_112ec"]
 
@@ -196,3 +197,6 @@ stream = ExtResource("11_kvpfn")
 
 [node name="InvestigationSystem" type="Node3D" parent="." unique_id=838133298]
 script = ExtResource("12_dinhu")
+
+[node name="AISystem" type="Node3D" parent="." unique_id=1440420602]
+script = ExtResource("13_kvuet")

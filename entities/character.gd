@@ -135,8 +135,36 @@ func move_along_path(path: Array[Vector2i]) -> void:
 
 	await tween.finished
 
-	visual.position = Vector3(0.0, 0.60, 0.0)
+	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
+	if perception_system != null:
+		var characters := get_tree().get_nodes_in_group("combatants")
 
+		for character_node in characters:
+			var observer := character_node as CharacterEntity
+
+			if observer == null:
+				continue
+
+			if observer == self:
+				continue
+
+			if not observer.is_alive:
+				continue
+
+			if perception_system.can_perceive_by_distance(observer, self):
+				var threshold_reached := perception_system.add_visual_activity(
+					observer,
+					self,
+					path.size()
+				)
+
+				if threshold_reached:
+					perception_system.check_visual_activity(
+						observer,
+						self
+					)
+
+	visual.position = Vector3(0.0, 0.60, 0.0)
 	is_moving = false
 
 	# Recupera a seleção.

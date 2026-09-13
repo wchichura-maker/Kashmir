@@ -183,6 +183,9 @@ func _on_perception_detected(
 	source: CharacterEntity,
 	target: CharacterEntity
 ) -> void:
+	if source == null or target == null:
+		return
+
 	print(
 		"Perception Event: %s detectou %s."
 		% [
@@ -190,6 +193,17 @@ func _on_perception_detected(
 			target.name
 		]
 	)
+
+	if not source.is_alive:
+		return
+
+	if not target.is_alive:
+		return
+
+	if source.faction == target.faction:
+		return
+
+	request_combat_start()
 
 func _initialize() -> void:
 	if auto_start_combat:
@@ -292,9 +306,6 @@ func _start_current_turn() -> void:
 	var resources: TurnResources = turn_resources[character]
 	resources.reset(30)
 	
-	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
-	if perception_system != null:
-		perception_system.update_all_perceptions()
 	var investigation_system := get_tree().get_first_node_in_group(
 		"investigation_system"
 	) as InvestigationSystem

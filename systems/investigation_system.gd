@@ -36,6 +36,7 @@ class InvestigationTarget:
 
 var investigation_targets: Dictionary = {}
 var active_investigations: Dictionary = {}
+var movement_system: MovementSystem
 
 @export_category("Investigation")
 @export var investigation_turns_per_radius: int = 2
@@ -49,8 +50,33 @@ func calculate_investigation_time(radius_cells: int) -> int:
 func _ready() -> void:
 	add_to_group("investigation_system")
 
+	movement_system = get_tree().get_first_node_in_group(
+		"movement_system"
+	) as MovementSystem
+
+	if movement_system == null:
+		push_error("InvestigationSystem: MovementSystem não encontrado.")
+		return
+
+	movement_system.exploration_move_finished.connect(
+		_on_exploration_move_finished
+	)
+
 	call_deferred("_connect_perception_system")
 
+func _on_exploration_move_finished(
+	character: CharacterEntity
+) -> void:
+	if character == null:
+		return
+
+	print(
+		"Investigation Debug: movimento de exploração concluído | character=%s | cell=%s"
+		% [
+			character.name,
+			str(character.grid_position)
+		]
+	)
 
 func _connect_perception_system() -> void:
 	var perception_system := get_tree().get_first_node_in_group(
@@ -112,16 +138,18 @@ func _on_sound_perceived(
 			origin_cell
 		)
 
-	target.center_cell = center_cell
-	target.sound_origin = sound.origin
-	target.sound_category = sound.category
-	target.search_turns_elapsed = 0
-	target.search_turn_limit = calculate_investigation_time(
-	target.radius_cells
-	)
-	
+	if target.state == InvestigationState.SUSPECTED:
+		target.center_cell = center_cell
+		target.sound_origin = sound.origin
+		target.sound_category = sound.category
+
+		if target.search_turn_limit <= 0:
+			target.search_turn_limit = calculate_investigation_time(
+				target.radius_cells
+			)
+
 	investigation_targets[listener_id] = target
-	
+
 	print(
 		"Investigation Debug: %s | center_cell=%s | origin_cell=%s | radius=%d | state=%s | elapsed=%d | limit=%d"
 		% [
@@ -134,7 +162,7 @@ func _on_sound_perceived(
 			target.search_turn_limit
 		]
 	)
-	
+
 	print(
 		"InvestigationSystem: %s suspeita de uma presença | origem do som=%s | categoria=%s"
 		% [
@@ -157,6 +185,30 @@ func get_investigation_target(
 		return null
 
 	return investigation_targets[listener_id] as InvestigationTarget
+
+func clear_investigation(
+	listener: CharacterEntity
+) -> void:
+	if listener == null:
+		return
+
+	var listener_id := listener.get_instance_id()
+
+	if not investigation_targets.has(listener_id):
+		return
+
+	var target := investigation_targets[listener_id] as InvestigationTarget
+
+	if target == null:
+		return
+
+	target.state = InvestigationState.INACTIVE
+	target.search_turns_elapsed = 0
+
+	print(
+		"InvestigationSystem: %s encerrou investigação porque a presença foi identificada."
+		% listener.name
+	)
 
 func process_investigation_turn_end() -> void:
 	for listener_id in investigation_targets:

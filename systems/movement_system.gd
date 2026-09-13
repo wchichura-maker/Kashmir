@@ -38,6 +38,8 @@ var path_visuals: Dictionary = {}
 var destination_visual: MeshInstance3D
 var debug_reported: bool = false
 
+signal exploration_move_finished(character: CharacterEntity)
+
 func _ready() -> void:
 	add_to_group("movement_system")
 
@@ -73,7 +75,7 @@ func _process(_delta: float) -> void:
 	if character != null and character.is_moving:
 		clear_preview()
 		return
-		
+
 	if character == null:
 		clear_preview()
 		return
@@ -239,7 +241,7 @@ func _update_destination_preview() -> void:
 		character.grid_position,
 		hovered_cell
 	)
-	
+
 	if path_cells.is_empty():
 		destination_visual.visible = false
 
@@ -399,7 +401,7 @@ func _find_path(
 		current_state = came_from[current_state]
 
 	return path
-	
+
 func _find_path_unrestricted(
 	origin: Vector2i,
 	destination: Vector2i
@@ -585,12 +587,12 @@ func _clear_visual_dictionary(
 func try_move_to_cell(cell: Vector2i) -> bool:
 	if grid_system == null or selection_system == null or turn_system == null:
 		return false
-	
+
 	if not turn_system.combat_active:
-		return _try_move_in_exploration(cell)
-		
+		return await _try_move_in_exploration(cell)
+
 	var character := selection_system.selected_character
-	
+
 	if character == null:
 		reachable_cells.clear()
 		_rebuild_reachable_visuals()
@@ -645,7 +647,7 @@ func try_move_to_cell(cell: Vector2i) -> bool:
 		return false
 
 	turn_system.mark_character_moved(character)
-	
+
 	var move_path: Array[Vector2i] = []
 	move_path.append_array(path_cells)
 
@@ -686,10 +688,12 @@ func _try_move_in_exploration(cell: Vector2i) -> bool:
 
 	clear_preview()
 
-	character.move_along_path(move_path)
+	await character.move_along_path(move_path)
+
+	exploration_move_finished.emit(character)
 
 	return true
-	
+
 func is_cell_beyond_current_movement(cell: Vector2i) -> bool:
 	var character := selection_system.selected_character
 
@@ -714,7 +718,7 @@ func is_cell_beyond_current_movement(cell: Vector2i) -> bool:
 	var movement_remaining := turn_system.get_movement_remaining_feet(character)
 
 	return path_cost > movement_remaining
-	
+
 func can_pass_through_cell(
 	cell: Vector2i,
 	moving_character: CharacterEntity
@@ -753,7 +757,7 @@ func can_pass_through_cell(
 		return true
 
 	return false
-	
+
 func can_end_movement_on_cell(
 	cell: Vector2i,
 	moving_character: CharacterEntity
@@ -781,7 +785,7 @@ func can_end_movement_on_cell(
 		return true
 
 	return false
-	
+
 func _can_move_diagonally(
 	from_cell: Vector2i,
 	to_cell: Vector2i
