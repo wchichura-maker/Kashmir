@@ -5,19 +5,19 @@ class_name AudioSystem
 
 func _ready() -> void:
 	add_to_group("audio_system")
-	call_deferred("_connect_perception_system")
+	call_deferred("_connect_sound_system")
 
-func _connect_perception_system() -> void:
-	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
-	if perception_system == null:
-		push_error("AudioSystem: PerceptionSystem não encontrado.")
+func _connect_sound_system() -> void:
+	var sound_system := get_tree().get_first_node_in_group("sound_system") as SoundSystem
+	if sound_system == null:
+		push_error("AudioSystem: SoundSystem não encontrado.")
 		return
 
-	if not perception_system.sound_perceived.is_connected(_on_sound_perceived):
-		perception_system.sound_perceived.connect(_on_sound_perceived)
+	if not sound_system.sound_emitted.is_connected(_on_sound_emitted):
+		sound_system.sound_emitted.connect(_on_sound_emitted)
 
-func _on_sound_perceived(listener: CharacterEntity, sound: SoundSystem.SoundEvent) -> void:
-	if listener == null or sound == null:
+func _on_sound_emitted(sound: SoundSystem.SoundEvent) -> void:
+	if sound == null:
 		return
 
 	var source_name := "Unknown"
@@ -25,11 +25,11 @@ func _on_sound_perceived(listener: CharacterEntity, sound: SoundSystem.SoundEven
 		source_name = sound.source.name
 
 	print(
-		"AudioSystem: som percebido por %s | origem=%s | categoria=%s"
+		"AudioSystem: som emitido | origem=%s | categoria=%s | fonte=%s"
 		% [
-			listener.name,
-			source_name,
-			SoundSystem.SoundCategory.keys()[sound.category]
+			str(sound.origin),
+			SoundSystem.SoundCategory.keys()[sound.category],
+			source_name
 		]
 	)
 
