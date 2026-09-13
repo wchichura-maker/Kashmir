@@ -7,6 +7,11 @@
 [ext_resource type="Script" uid="uid://b0jdfaov2f1ji" path="res://systems/movement_system.gd" id="4_lbhrr"]
 [ext_resource type="Script" uid="uid://bdyhuw7ccakcb" path="res://systems/turn_system.gd" id="6_p57ef"]
 [ext_resource type="Script" uid="uid://dl37j0it46y5n" path="res://systems/combat_hud.gd" id="7_u5sy4"]
+[ext_resource type="Script" uid="uid://dtq8r2psu8ea6" path="res://systems/perception_system.gd" id="8_gee14"]
+[ext_resource type="Script" uid="uid://dmdcds0gfh1sf" path="res://systems/sound_system.gd" id="9_0tnpc"]
+[ext_resource type="Script" uid="uid://k2whgxysasr5" path="res://systems/audio_system.gd" id="10_vtaks"]
+[ext_resource type="AudioStream" uid="uid://dnjygh04c3j8x" path="res://audio/test_hearing.wav" id="11_kvpfn"]
+[ext_resource type="Script" uid="uid://cdp4b3co4asfb" path="res://systems/investigation_system.gd" id="12_dinhu"]
 
 [sub_resource type="Environment" id="Environment_112ec"]
 
@@ -60,6 +65,7 @@ shape = SubResource("BoxShape3D_usrgj")
 [node name="Player" type="Node3D" parent="World/Characters" unique_id=1156301488]
 script = ExtResource("2_yqjtg")
 grid_position = Vector2i(10, 8)
+equipment_sound_level = "Heavy"
 
 [node name="Visual" type="MeshInstance3D" parent="World/Characters/Player" unique_id=1104625015]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
@@ -175,3 +181,18 @@ text = "END TURN"
 offset_right = 24.0
 offset_bottom = 24.0
 text = "Não me pergunte novamente"
+
+[node name="PerceptionSystem" type="Node3D" parent="." unique_id=619800072]
+script = ExtResource("8_gee14")
+
+[node name="SoundSystem" type="Node3D" parent="." unique_id=502299273]
+script = ExtResource("9_0tnpc")
+
+[node name="AudioSystem" type="Node3D" parent="." unique_id=1315285522]
+script = ExtResource("10_vtaks")
+
+[node name="AudioPlayer" type="AudioStreamPlayer3D" parent="AudioSystem" unique_id=662061738]
+stream = ExtResource("11_kvpfn")
+
+[node name="InvestigationSystem" type="Node3D" parent="." unique_id=838133298]
+script = ExtResource("12_dinhu")

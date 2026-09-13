@@ -166,8 +166,30 @@ var initiative_results: Dictionary = {}
 func _ready() -> void:
 	add_to_group("turn_system")
 
+	call_deferred("_connect_perception_system")
 	call_deferred("_initialize")
 
+func _connect_perception_system() -> void:
+	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
+
+	if perception_system == null:
+		push_error("TurnSystem: PerceptionSystem não encontrado.")
+		return
+
+	if not perception_system.perception_detected.is_connected(_on_perception_detected):
+		perception_system.perception_detected.connect(_on_perception_detected)
+
+func _on_perception_detected(
+	source: CharacterEntity,
+	target: CharacterEntity
+) -> void:
+	print(
+		"Perception Event: %s detectou %s."
+		% [
+			source.name,
+			target.name
+		]
+	)
 
 func _initialize() -> void:
 	if auto_start_combat:
@@ -269,7 +291,17 @@ func _start_current_turn() -> void:
 
 	var resources: TurnResources = turn_resources[character]
 	resources.reset(30)
+	
+	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
+	if perception_system != null:
+		perception_system.update_all_perceptions()
+	var investigation_system := get_tree().get_first_node_in_group(
+		"investigation_system"
+	) as InvestigationSystem
 
+	if investigation_system != null:
+		investigation_system.evaluate_investigation_decision(character)
+		
 	print("")
 	print(">>> TURNO DE %s <<<" % character.name)
 	print(
@@ -297,6 +329,13 @@ func end_turn() -> void:
 
 	turn_ended.emit(finished_character)
 
+	var investigation_system := get_tree().get_first_node_in_group(
+		"investigation_system"
+	) as InvestigationSystem
+
+	if investigation_system != null:
+		investigation_system.process_investigation_turn_end()
+	
 	current_actor = null
 	_advance_turn()
 

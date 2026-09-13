@@ -9,8 +9,21 @@ class_name CharacterEntity
 @export var is_helpless: bool = false
 @export var initiative_modifier: int = 0
 
+@export_category("Perception")
+@export var spot_modifier: int = 0
+@export var listen_modifier: int = 0
+@export var hide_modifier: int = 0
+@export var move_silently_modifier: int = 0
+
+@export var base_visual_dc: int = 10
+
 @export_category("Movement")
 @export var move_step_duration: float = 0.12
+
+@export_category("Equipment")
+@export var equipment_sound_enabled: bool = true
+@export_enum("Silent", "Light", "Normal", "Heavy") var equipment_sound_level: String = "Normal"
+@export var equipment_sound_dc: int = 5
 
 @onready var visual: Node3D = $Visual
 
@@ -105,21 +118,23 @@ func move_along_path(path: Array[Vector2i]) -> void:
 
 	# Percorre cada célula do caminho.
 	for cell in path:
-		var step_world := (
-			grid_system.grid_to_world(cell)
-			+ Vector3(0.0, 0.60, 0.0)
-		)
+		var step_world := grid_system.grid_to_world(cell) + Vector3(0.0, 0.60, 0.0)
+		tween.tween_property(visual, "global_position", step_world, move_step_duration)
 
-		tween.tween_property(
-			visual,
-			"global_position",
-			step_world,
-			move_step_duration
-		)
+		var sound_system := get_tree().get_first_node_in_group("sound_system") as SoundSystem
+
+		if sound_system != null:
+			var movement_profile := sound_system.create_movement_sound_profile(self)
+
+			sound_system.create_sound_event_from_profile(
+				self,
+				SoundSystem.SoundCategory.FOOTSTEP,
+				movement_profile,
+				"Movimento"
+			)
 
 	await tween.finished
 
-	# Retorna o Visual para sua posição normal relativa ao Player.
 	visual.position = Vector3(0.0, 0.60, 0.0)
 
 	is_moving = false
