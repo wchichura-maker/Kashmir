@@ -16,7 +16,7 @@ const DIRECTIONS: Array[Vector2i] = [
 ]
 
 @export_category("Movement")
-@export var movement_speed_feet: int = 30
+@export var movement_remaining_feet: int = 30
 
 
 @export_category("Visual")
@@ -27,6 +27,7 @@ const DIRECTIONS: Array[Vector2i] = [
 
 var grid_system: GridSystem
 var selection_system: SelectionSystem
+var turn_system: TurnSystem
 
 var reachable_cells: Array[Vector2i] = []
 var path_cells: Array[Vector2i] = []
@@ -44,19 +45,21 @@ func _ready() -> void:
 
 
 func _initialize() -> void:
-	grid_system = get_tree().get_first_node_in_group(
-		"grid_system"
-	) as GridSystem
-
-	selection_system = get_tree().get_first_node_in_group(
-		"selection_system"
-	) as SelectionSystem
+	grid_system = get_tree().get_first_node_in_group("grid_system") as GridSystem
+	selection_system = get_tree().get_first_node_in_group("selection_system") as SelectionSystem
+	turn_system = get_tree().get_first_node_in_group("turn_system") as TurnSystem
 
 	if grid_system == null:
 		push_error("MovementSystem: GridSystem not found.")
+		return
 
 	if selection_system == null:
 		push_error("MovementSystem: SelectionSystem not found.")
+		return
+
+	if turn_system == null:
+		push_error("MovementSystem: TurnSystem not found.")
+		return
 
 	_create_destination_visual()
 
@@ -86,6 +89,11 @@ func _update_reachable_cells(origin: Vector2i) -> void:
 		reachable_cells.clear()
 		_rebuild_reachable_visuals()
 		return
+
+	var movement_budget := 999999
+
+	if turn_system.combat_active:
+		movement_budget = turn_system.get_movement_remaining_feet(character)
 
 	var distances: Dictionary = {}
 	var states: Array[Vector3i] = []
@@ -150,7 +158,7 @@ func _update_reachable_cells(origin: Vector2i) -> void:
 
 			var new_cost := current_cost + movement_cost
 
-			if new_cost > movement_speed_feet:
+			if new_cost > movement_budget:
 				continue
 
 			var next_state := Vector3i(
@@ -275,6 +283,8 @@ func _find_path(
 	if character == null:
 		return []
 
+	var movement_budget := turn_system.get_movement_remaining_feet(character)
+
 	var distances: Dictionary = {}
 	var came_from: Dictionary = {}
 	var states: Array[Vector3i] = []
@@ -354,7 +364,7 @@ func _find_path(
 
 			var new_cost := current_cost + movement_cost
 
-			if new_cost > movement_speed_feet:
+			if new_cost > movement_budget:
 				continue
 
 			var next_state := Vector3i(
@@ -390,6 +400,129 @@ func _find_path(
 
 	return path
 	
+func _find_path_unrestricted(
+	origin: Vector2i,
+	destination: Vector2i
+) -> Array[Vector2i]:
+	var character := selection_system.selected_character
+
+	if character == null:
+		return []
+
+	# Permite calcular o caminho sem o limite atual
+	# apenas para descobrir o custo total até o destino.
+	var path_budget := 999999
+
+	var distances: Dictionary = {}
+	var came_from: Dictionary = {}
+	var states: Array[Vector3i] = []
+
+	var start_state := Vector3i(
+		origin.x,
+		origin.y,
+		0
+	)
+
+	distances[start_state] = 0
+	came_from[start_state] = start_state
+	states.append(start_state)
+
+	var destination_state := start_state
+
+	while not states.is_empty():
+		var best_index := 0
+		var best_state: Vector3i = states[0]
+
+		for i in range(1, states.size()):
+			if distances[states[i]] < distances[best_state]:
+				best_index = i
+				best_state = states[i]
+
+		states.remove_at(best_index)
+
+		var current := Vector2i(
+			best_state.x,
+			best_state.y
+		)
+
+		var current_cost: int = distances[best_state]
+		var diagonal_parity: int = best_state.z
+
+		if current == destination:
+			destination_state = best_state
+			break
+
+		for direction in DIRECTIONS:
+			var next_cell := current + direction
+
+			if not grid_system.is_inside_grid(next_cell):
+				continue
+
+			if not can_pass_through_cell(
+				next_cell,
+				character
+			):
+				continue
+
+			if not _can_move_diagonally(
+				current,
+				next_cell
+			):
+				continue
+
+			var is_diagonal := (
+				direction.x != 0
+				and direction.y != 0
+			)
+
+			var movement_cost := 5
+			var next_parity := diagonal_parity
+
+			if is_diagonal:
+				if diagonal_parity == 0:
+					movement_cost = 5
+				else:
+					movement_cost = 10
+
+				next_parity = 1 - diagonal_parity
+
+			var new_cost := current_cost + movement_cost
+
+			if new_cost > path_budget:
+				continue
+
+			var next_state := Vector3i(
+				next_cell.x,
+				next_cell.y,
+				next_parity
+			)
+
+			if not distances.has(next_state):
+				distances[next_state] = new_cost
+				came_from[next_state] = best_state
+				states.append(next_state)
+			elif new_cost < distances[next_state]:
+				distances[next_state] = new_cost
+				came_from[next_state] = best_state
+
+	if not distances.has(destination_state):
+		return []
+
+	var path: Array[Vector2i] = []
+	var current_state: Vector3i = destination_state
+
+	while current_state != start_state:
+		path.push_front(
+			Vector2i(
+				current_state.x,
+				current_state.y
+			)
+		)
+
+		current_state = came_from[current_state]
+
+	return path
+
 func _create_destination_visual() -> void:
 	destination_visual = _create_cell_visual(
 		Color(0.35, 0.75, 1.0, destination_alpha)
@@ -450,9 +583,79 @@ func _clear_visual_dictionary(
 
 	visual_dictionary.clear()
 func try_move_to_cell(cell: Vector2i) -> bool:
-	if grid_system == null or selection_system == null:
+	if grid_system == null or selection_system == null or turn_system == null:
+		return false
+	
+	if not turn_system.combat_active:
+		return _try_move_in_exploration(cell)
+		
+	var character := selection_system.selected_character
+	
+	if character == null:
+		reachable_cells.clear()
+		_rebuild_reachable_visuals()
 		return false
 
+	if character.is_moving:
+		return false
+
+	if not turn_system.is_character_turn(character):
+		return false
+
+	if not turn_system.can_start_movement(character):
+		return false
+
+	if not grid_system.is_inside_grid(cell):
+		return false
+
+	if grid_system.is_cell_blocked(cell):
+		return false
+
+	if not can_end_movement_on_cell(cell, character):
+		return false
+
+	if not reachable_cells.has(cell):
+		if not is_cell_beyond_current_movement(cell):
+			return false
+
+		if not turn_system.has_second_move_potential(character):
+			return false
+
+		var combat_hud := get_tree().get_first_node_in_group("combat_hud")
+
+		if combat_hud == null:
+			push_error("MovementSystem: CombatHUD not found.")
+			return false
+
+		combat_hud.show_second_move_confirmation()
+		return false
+
+	if path_cells.is_empty():
+		return false
+
+	var movement_cost := _get_path_cost_feet(path_cells)
+
+	if not turn_system.can_continue_movement(character, movement_cost):
+		return false
+
+	if not turn_system.start_movement(character):
+		return false
+
+	if not turn_system.consume_movement(character, movement_cost):
+		return false
+
+	turn_system.mark_character_moved(character)
+	
+	var move_path: Array[Vector2i] = []
+	move_path.append_array(path_cells)
+
+	clear_preview()
+
+	character.move_along_path(move_path)
+
+	return true
+
+func _try_move_in_exploration(cell: Vector2i) -> bool:
 	var character := selection_system.selected_character
 
 	if character == null:
@@ -466,33 +669,52 @@ func try_move_to_cell(cell: Vector2i) -> bool:
 
 	if grid_system.is_cell_blocked(cell):
 		return false
-		
+
 	if not can_end_movement_on_cell(cell, character):
 		return false
-		
-	if not reachable_cells.has(cell):
-		return false
-		
-	if cell == character.grid_position:
-		return false
 
-	_build_path(
+	var path := _find_path_unrestricted(
 		character.grid_position,
 		cell
 	)
 
-	if path_cells.is_empty():
+	if path.is_empty():
 		return false
 
 	var move_path: Array[Vector2i] = []
-	move_path.append_array(path_cells)
+	move_path.append_array(path)
 
 	clear_preview()
 
 	character.move_along_path(move_path)
 
 	return true
+	
+func is_cell_beyond_current_movement(cell: Vector2i) -> bool:
+	var character := selection_system.selected_character
 
+	if character == null:
+		return false
+
+	if not grid_system.is_inside_grid(cell):
+		return false
+
+	if reachable_cells.has(cell):
+		return false
+
+	var path := _find_path_unrestricted(
+		character.grid_position,
+		cell
+	)
+
+	if path.is_empty():
+		return false
+
+	var path_cost := _get_path_cost_feet(path)
+	var movement_remaining := turn_system.get_movement_remaining_feet(character)
+
+	return path_cost > movement_remaining
+	
 func can_pass_through_cell(
 	cell: Vector2i,
 	moving_character: CharacterEntity
@@ -592,3 +814,27 @@ func _can_move_diagonally(
 		return false
 
 	return true
+
+func _get_path_cost_feet(path: Array[Vector2i]) -> int:
+	var total_cost := 0
+	var diagonal_count := 0
+
+	var previous_cell := selection_system.selected_character.grid_position
+
+	for cell in path:
+		var difference := cell - previous_cell
+		var is_diagonal := difference.x != 0 and difference.y != 0
+
+		if is_diagonal:
+			if diagonal_count % 2 == 0:
+				total_cost += 5
+			else:
+				total_cost += 10
+
+			diagonal_count += 1
+		else:
+			total_cost += 5
+
+		previous_cell = cell
+
+	return total_cost

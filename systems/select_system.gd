@@ -9,7 +9,20 @@ func _ready() -> void:
 	add_to_group("selection_system")
 func _process(_delta: float) -> void:
 	_update_hover()
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("interact"):
+		var turn_system := get_tree().get_first_node_in_group(
+			"turn_system"
+		) as TurnSystem
+
+		if turn_system != null and not turn_system.combat_active:
+			turn_system.request_combat_start()
+
+		get_viewport().set_input_as_handled()
+		return
+
 	if not event.is_action_pressed("select_cell"):
 		return
 

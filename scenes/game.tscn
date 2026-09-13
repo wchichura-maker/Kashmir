@@ -5,6 +5,8 @@
 [ext_resource type="Script" uid="uid://sb62byt4cj5g" path="res://entities/obstacle.gd" id="3_iywne"]
 [ext_resource type="Script" uid="uid://6h6nvuunqf3" path="res://systems/select_system.gd" id="3_lnu2h"]
 [ext_resource type="Script" uid="uid://b0jdfaov2f1ji" path="res://systems/movement_system.gd" id="4_lbhrr"]
+[ext_resource type="Script" uid="uid://bdyhuw7ccakcb" path="res://systems/turn_system.gd" id="6_p57ef"]
+[ext_resource type="Script" uid="uid://dl37j0it46y5n" path="res://systems/combat_hud.gd" id="7_u5sy4"]
 
 [sub_resource type="Environment" id="Environment_112ec"]
 
@@ -111,3 +113,65 @@ metadata/_custom_type_script = "uid://6h6nvuunqf3"
 
 [node name="MovementSystem" type="Node3D" parent="." unique_id=95700359]
 script = ExtResource("4_lbhrr")
+
+[node name="TurnSystem" type="Node3D" parent="." unique_id=211708004]
+script = ExtResource("6_p57ef")
+
+[node name="CombatHUD" type="CanvasLayer" parent="." unique_id=697880019]
+script = ExtResource("7_u5sy4")
+
+[node name="ActionPanel" type="Panel" parent="CombatHUD" unique_id=1657425597]
+
+[node name="Actions" type="VBoxContainer" parent="CombatHUD/ActionPanel" unique_id=1088874783]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="TurnLabel" type="Label" parent="CombatHUD/ActionPanel/Actions" unique_id=1821483422]
+layout_mode = 2
+text = "TURN: -"
+
+[node name="RoundLabel" type="Label" parent="CombatHUD/ActionPanel/Actions" unique_id=1727078241]
+layout_mode = 2
+text = "ROUND: -"
+
+[node name="HSeparator" type="HSeparator" parent="CombatHUD/ActionPanel/Actions" unique_id=338173387]
+layout_mode = 2
+
+[node name="StandardStatus" type="Label" parent="CombatHUD/ActionPanel/Actions" unique_id=1334890591]
+layout_mode = 2
+text = "Standard: AVAILABLE"
+
+[node name="MoveStatus" type="Label" parent="CombatHUD/ActionPanel/Actions" unique_id=362548611]
+layout_mode = 2
+text = "Move: AVAILABLE"
+
+[node name="FullRoundStatus" type="Label" parent="CombatHUD/ActionPanel/Actions" unique_id=1357412023]
+layout_mode = 2
+text = "Full Round: AVAILABLE"
+
+[node name="HSeparator2" type="HSeparator" parent="CombatHUD/ActionPanel/Actions" unique_id=4679137]
+layout_mode = 2
+
+[node name="StandardButton" type="Button" parent="CombatHUD/ActionPanel/Actions" unique_id=1745308104]
+layout_mode = 2
+text = "Use Standard Action"
+
+[node name="MoveButton" type="Button" parent="CombatHUD/ActionPanel/Actions" unique_id=1062490339]
+layout_mode = 2
+text = "Move Action"
+
+[node name="FullRoundButton" type="Button" parent="CombatHUD/ActionPanel/Actions" unique_id=75481095]
+layout_mode = 2
+text = "Use Full-Round Action"
+
+[node name="EndTurnButton" type="Button" parent="CombatHUD/ActionPanel/Actions" unique_id=1437316349]
+layout_mode = 2
+text = "END TURN"
+
+[node name="SecondMoveConfirmation" type="ConfirmationDialog" parent="CombatHUD" unique_id=1723706096]
+
+[node name="DontAskAgainCheckBox" type="CheckBox" parent="CombatHUD/SecondMoveConfirmation" unique_id=285937696]
+offset_right = 24.0
+offset_bottom = 24.0
+text = "Não me pergunte novamente"

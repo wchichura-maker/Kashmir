@@ -7,6 +7,7 @@ class_name CharacterEntity
 @export_enum("Ally", "Enemy") var faction: String = "Ally"
 @export var is_alive: bool = true
 @export var is_helpless: bool = false
+@export var initiative_modifier: int = 0
 
 @export_category("Movement")
 @export var move_step_duration: float = 0.12
@@ -20,6 +21,7 @@ var selection_visual: MeshInstance3D
 
 
 func _ready() -> void:
+	add_to_group("combatants")
 	_create_selection_visual()
 	call_deferred("_sync_from_grid")
 
