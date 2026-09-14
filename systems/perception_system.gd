@@ -70,8 +70,13 @@ func _ready() -> void:
 	add_to_group("perception_system")
 
 	call_deferred("_connect_sound_system")
-	call_deferred("update_all_perceptions")
+	call_deferred("_update_all_perceptions_deferred")
 
+func _update_all_perceptions_deferred() -> void:
+	await get_tree().physics_frame
+
+	update_all_perceptions()
+	
 func _connect_sound_system() -> void:
 	var sound_system := get_tree().get_first_node_in_group("sound_system") as SoundSystem
 
@@ -608,6 +613,14 @@ func has_line_of_sight(
 		return false
 
 	var space_state := get_world_3d().direct_space_state
+
+	print(
+		"LOS Position Debug | source=%s | target=%s"
+		% [
+			str(source.global_position),
+			str(target.global_position)
+		]
+	)
 
 	var query := PhysicsRayQueryParameters3D.create(
 		source.global_position + Vector3(0.0, 0.60, 0.0),
