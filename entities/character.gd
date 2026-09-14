@@ -30,6 +30,14 @@ class_name CharacterEntity
 var world_position: Vector3
 var is_selected: bool = false
 var is_moving: bool = false
+var movement_interrupted: bool = false
+
+func interrupt_movement() -> void:
+	if not is_moving:
+		return
+
+	movement_interrupted = true
+
 var selection_visual: MeshInstance3D
 
 
@@ -62,20 +70,23 @@ func _sync_from_grid() -> void:
 	)
 
 
-func move_along_path(path: Array[Vector2i]) -> void:
+func move_along_path(path: Array[Vector2i]) -> bool:
 	if is_moving:
-		return
+		return false
 
 	if path.is_empty():
-		return
+		return false
 
-	var grid_system := get_tree().get_first_node_in_group("grid_system") as GridSystem
+	var grid_system := get_tree().get_first_node_in_group(
+		"grid_system"
+	) as GridSystem
 
 	if grid_system == null:
 		push_error("CharacterEntity: GridSystem not found during movement.")
-		return
+		return false
 
 	is_moving = true
+	movement_interrupted = false
 
 	# Guardamos se o personagem estava selecionado.
 	var was_selected := is_selected
@@ -84,47 +95,53 @@ func move_along_path(path: Array[Vector2i]) -> void:
 	if is_instance_valid(selection_visual):
 		selection_visual.visible = false
 
-	# Posição visual atual do personagem.
-	var start_world := global_position
-	
-	var previous_cell := grid_position
+	# A posição visual atual do personagem.
 
-	grid_system.clear_cell_occupied(previous_cell)
-	
-	# Destino lógico.
-	var destination_cell: Vector2i = path[path.size() - 1]
-	var destination_world := grid_system.grid_to_world(destination_cell)
 
-	# A posição lógica passa imediatamente a ser o destino.
-	grid_position = destination_cell
-	world_position = destination_world
-	
-	grid_system.set_cell_occupied(
-		grid_position,
-		self
-	)
-	
-	# O corpo lógico fica no destino.
-	global_position = destination_world
-
-	# Mantemos o modelo visual temporariamente na posição antiga.
-	visual.global_position = start_world + Vector3(0.0, 0.60, 0.0)
-
-	# Cria a animação.
-	var tween := create_tween()
-
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_IN_OUT)
-
-	# Percorre cada célula do caminho.
 	for cell in path:
-		var step_world := grid_system.grid_to_world(cell) + Vector3(0.0, 0.60, 0.0)
-		tween.tween_property(visual, "global_position", step_world, move_step_duration)
+		if movement_interrupted:
+			break
 
-		var sound_system := get_tree().get_first_node_in_group("sound_system") as SoundSystem
+		var step_world := grid_system.grid_to_world(cell)
+		var step_visual_world := step_world + Vector3(0.0, 0.60, 0.0)
+
+		# Atualiza a posição lógica somente para a célula
+		# que está sendo alcançada agora.
+		grid_system.clear_cell_occupied(grid_position)
+
+		grid_position = cell
+		world_position = step_world
+
+		grid_system.set_cell_occupied(
+			grid_position,
+			self
+		)
+
+		# O corpo lógico acompanha a célula atual.
+		global_position = step_world
+
+		# Cria um Tween somente para esta célula.
+		var tween := create_tween()
+
+		tween.set_trans(Tween.TRANS_SINE)
+		tween.set_ease(Tween.EASE_IN_OUT)
+
+		tween.tween_property(
+			visual,
+			"global_position",
+			step_visual_world,
+			move_step_duration
+		)
+
+		# Som do passo.
+		var sound_system := get_tree().get_first_node_in_group(
+			"sound_system"
+		) as SoundSystem
 
 		if sound_system != null:
-			var movement_profile := sound_system.create_movement_sound_profile(self)
+			var movement_profile := sound_system.create_movement_sound_profile(
+				self
+			)
 
 			sound_system.create_sound_event_from_profile(
 				self,
@@ -133,43 +150,66 @@ func move_along_path(path: Array[Vector2i]) -> void:
 				"Movimento"
 			)
 
-	await tween.finished
+		await tween.finished
 
-	var perception_system := get_tree().get_first_node_in_group("perception_system") as PerceptionSystem
-	if perception_system != null:
-		var characters := get_tree().get_nodes_in_group("combatants")
+		if movement_interrupted:
+			break
 
-		for character_node in characters:
-			var observer := character_node as CharacterEntity
+		# Avalia percepção visual após alcançar esta célula.
+		var perception_system := get_tree().get_first_node_in_group(
+			"perception_system"
+		) as PerceptionSystem
 
-			if observer == null:
-				continue
+		if perception_system != null:
+			var characters := get_tree().get_nodes_in_group("combatants")
 
-			if observer == self:
-				continue
+			for character_node in characters:
+				var observer := character_node as CharacterEntity
 
-			if not observer.is_alive:
-				continue
+				if observer == null:
+					continue
 
-			if perception_system.can_perceive_by_distance(observer, self):
-				var threshold_reached := perception_system.add_visual_activity(
+				if observer == self:
+					continue
+
+				if not observer.is_alive:
+					continue
+
+				if perception_system.can_perceive_by_distance(
 					observer,
-					self,
-					path.size()
-				)
-
-				if threshold_reached:
-					perception_system.check_visual_activity(
+					self
+				):
+					var threshold_reached := perception_system.add_visual_activity(
 						observer,
-						self
+						self,
+						1
 					)
 
-	visual.position = Vector3(0.0, 0.60, 0.0)
-	is_moving = false
+					if threshold_reached:
+						perception_system.check_visual_activity(
+							observer,
+							self
+						)
 
-	# Recupera a seleção.
+						if movement_interrupted:
+							break
+
+		if movement_interrupted:
+			break
+
+
+	# Garante que o visual fique exatamente na última célula alcançada.
+	visual.global_position = global_position + Vector3(0.0, 0.60, 0.0)
+
+	var completed_normally := not movement_interrupted
+
+	is_moving = false
+	movement_interrupted = false
+
 	if was_selected and is_instance_valid(selection_visual):
 		selection_visual.visible = true
+
+	return completed_normally
 
 
 func set_selected(value: bool) -> void:

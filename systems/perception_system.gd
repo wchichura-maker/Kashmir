@@ -482,6 +482,8 @@ func check_visual_activity(
 	activity.reset_visual()
 
 	if detected:
+		source.interrupt_movement()
+
 		if perception_result == null:
 			perception_result = create_result(source, target)
 

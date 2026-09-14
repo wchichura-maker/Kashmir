@@ -105,6 +105,9 @@ func _on_sound_perceived(
 	if sound.source == null:
 		return
 
+	if listener.faction != "Enemy":
+		return
+
 	var listener_id := listener.get_instance_id()
 
 	var grid_system := get_tree().get_first_node_in_group(
@@ -150,6 +153,9 @@ func _on_sound_perceived(
 
 	investigation_targets[listener_id] = target
 
+	if target.state == InvestigationState.SUSPECTED:
+		start_investigation(listener)
+
 	print(
 		"Investigation Debug: %s | center_cell=%s | origin_cell=%s | radius=%d | state=%s | elapsed=%d | limit=%d"
 		% [
@@ -172,6 +178,45 @@ func _on_sound_perceived(
 		]
 	)
 
+func _find_investigation_cell(
+	listener: CharacterEntity,
+	center_cell: Vector2i
+) -> Vector2i:
+	if listener == null:
+		return Vector2i(-1, -1)
+
+	var candidates: Array[Vector2i] = [
+		center_cell,
+		center_cell + Vector2i(1, 0),
+		center_cell + Vector2i(-1, 0),
+		center_cell + Vector2i(0, 1),
+		center_cell + Vector2i(0, -1),
+		center_cell + Vector2i(1, 1),
+		center_cell + Vector2i(1, -1),
+		center_cell + Vector2i(-1, 1),
+		center_cell + Vector2i(-1, -1)
+	]
+
+	for candidate in candidates:
+		if not movement_system.can_end_movement_on_cell(
+			candidate,
+			listener
+		):
+			continue
+
+		var path := movement_system.find_investigation_path(
+			listener.grid_position,
+			candidate,
+			listener
+		)
+
+		if candidate == listener.grid_position:
+			return candidate
+
+		if not path.is_empty():
+			return candidate
+
+	return Vector2i(-1, -1)
 
 func get_investigation_target(
 	listener: CharacterEntity
@@ -185,6 +230,24 @@ func get_investigation_target(
 		return null
 
 	return investigation_targets[listener_id] as InvestigationTarget
+
+func clear_all_investigations() -> void:
+	for listener_id in investigation_targets:
+		var target := investigation_targets[listener_id] as InvestigationTarget
+
+		if target == null:
+			continue
+
+		target.state = InvestigationState.INACTIVE
+		target.search_turns_elapsed = 0
+
+		var listener := instance_from_id(listener_id) as CharacterEntity
+
+		if listener != null:
+			listener.interrupt_movement()
+
+	print("InvestigationSystem: todas as investigações foram encerradas.")
+
 
 func clear_investigation(
 	listener: CharacterEntity
@@ -249,14 +312,29 @@ func start_investigation(
 	target.state = InvestigationState.MOVING_TO_SOUND
 	target.search_turns_elapsed = 0
 
+	var investigation_cell := _find_investigation_cell(
+		listener,
+		target.center_cell
+	)
+
+	if investigation_cell.x < 0 or investigation_cell.y < 0:
+		print(
+			"InvestigationSystem: %s não encontrou uma célula acessível para investigar."
+			% listener.name
+		)
+
+		target.state = InvestigationState.SEARCHING
+		return false
+
 	var path: Array[Vector2i] = movement_system.find_investigation_path(
 		listener.grid_position,
-		target.center_cell
+		investigation_cell,
+		listener
 	)
 
 	if path.is_empty():
 		print(
-			"InvestigationSystem: %s não encontrou caminho até o som."
+			"InvestigationSystem: %s não encontrou caminho até a célula de investigação."
 			% listener.name
 		)
 
@@ -274,6 +352,9 @@ func start_investigation(
 	)
 
 	await listener.move_along_path(path)
+
+	if target.state == InvestigationState.INACTIVE:
+		return false
 
 	target.state = InvestigationState.SEARCHING
 

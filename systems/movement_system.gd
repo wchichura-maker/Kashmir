@@ -404,18 +404,20 @@ func _find_path(
 
 func find_investigation_path(
 	origin: Vector2i,
-	destination: Vector2i
+	destination: Vector2i,
+	character: CharacterEntity
 ) -> Array[Vector2i]:
 	return _find_path_unrestricted(
 		origin,
-		destination
+		destination,
+		character
 	)
 
 func _find_path_unrestricted(
 	origin: Vector2i,
-	destination: Vector2i
+	destination: Vector2i,
+	character: CharacterEntity
 ) -> Array[Vector2i]:
-	var character := selection_system.selected_character
 
 	if character == null:
 		return []
@@ -686,7 +688,8 @@ func _try_move_in_exploration(cell: Vector2i) -> bool:
 
 	var path := _find_path_unrestricted(
 		character.grid_position,
-		cell
+		cell,
+		character
 	)
 
 	if path.is_empty():
@@ -697,11 +700,12 @@ func _try_move_in_exploration(cell: Vector2i) -> bool:
 
 	clear_preview()
 
-	await character.move_along_path(move_path)
+	var movement_completed := await character.move_along_path(move_path)
 
-	exploration_move_finished.emit(character)
+	if movement_completed:
+		exploration_move_finished.emit(character)
 
-	return true
+	return movement_completed
 
 func is_cell_beyond_current_movement(cell: Vector2i) -> bool:
 	var character := selection_system.selected_character
@@ -717,7 +721,8 @@ func is_cell_beyond_current_movement(cell: Vector2i) -> bool:
 
 	var path := _find_path_unrestricted(
 		character.grid_position,
-		cell
+		cell,
+		character
 	)
 
 	if path.is_empty():

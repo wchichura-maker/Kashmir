@@ -249,6 +249,17 @@ func start_combat() -> void:
 
 	print("========================================")
 
+	var investigation_system := get_tree().get_first_node_in_group(
+		"investigation_system"
+	) as InvestigationSystem
+
+	if investigation_system != null:
+		investigation_system.clear_all_investigations()
+
+	for character in characters:
+		if character.is_moving:
+			character.interrupt_movement()
+
 	combat_started.emit()
 
 	_start_round()
