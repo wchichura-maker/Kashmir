@@ -209,17 +209,6 @@ func perform_visual_check(
 
 	var visual_dc := target.base_visual_dc
 
-	print(
-		"Spot Test: %s -> %s | d20=%d | total=%d | DC=%d"
-		% [
-			source.name,
-			target.name,
-			spot_roll,
-			spot_total,
-			visual_dc
-		]
-	)
-
 	return spot_total >= visual_dc
 
 func create_result(
@@ -614,14 +603,6 @@ func has_line_of_sight(
 
 	var space_state := get_world_3d().direct_space_state
 
-	print(
-		"LOS Position Debug | source=%s | target=%s"
-		% [
-			str(source.global_position),
-			str(target.global_position)
-		]
-	)
-
 	var query := PhysicsRayQueryParameters3D.create(
 		source.global_position + Vector3(0.0, 0.60, 0.0),
 		target.global_position + Vector3(0.0, 0.60, 0.0)
@@ -631,14 +612,6 @@ func has_line_of_sight(
 	query.collide_with_bodies = true
 
 	var result := space_state.intersect_ray(query)
-
-	print(
-		"LOS Ray Debug | collider=%s | position=%s"
-		% [
-			str(result.get("collider")),
-			str(result.get("position"))
-		]
-	)
 
 	if result.is_empty():
 		return true
