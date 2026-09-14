@@ -402,6 +402,15 @@ func _find_path(
 
 	return path
 
+func find_investigation_path(
+	origin: Vector2i,
+	destination: Vector2i
+) -> Array[Vector2i]:
+	return _find_path_unrestricted(
+		origin,
+		destination
+	)
+
 func _find_path_unrestricted(
 	origin: Vector2i,
 	destination: Vector2i

@@ -34,6 +34,9 @@ radius = 0.45
 [sub_resource type="BoxMesh" id="BoxMesh_usrgj"]
 size = Vector3(1.2, 1.5, 1.2)
 
+[sub_resource type="BoxShape3D" id="BoxShape3D_obstacle"]
+size = Vector3(1.2, 1.5, 1.2)
+
 [node name="Game" type="Node3D" unique_id=1375293261]
 
 [node name="World" type="Node3D" parent="." unique_id=1123028775]
@@ -65,7 +68,7 @@ shape = SubResource("BoxShape3D_usrgj")
 
 [node name="Player" type="Node3D" parent="World/Characters" unique_id=1156301488]
 script = ExtResource("2_yqjtg")
-grid_position = Vector2i(10, 8)
+grid_position = Vector2i(12, 8)
 equipment_sound_level = "Heavy"
 
 [node name="Visual" type="MeshInstance3D" parent="World/Characters/Player" unique_id=1104625015]
@@ -81,7 +84,7 @@ shape = SubResource("CylinderShape3D_usrgj")
 
 [node name="Enemy" type="Node3D" parent="World/Characters" unique_id=1598990953]
 script = ExtResource("2_yqjtg")
-grid_position = Vector2i(12, 8)
+grid_position = Vector2i(14, 8)
 faction = "Enemy"
 
 [node name="Visual" type="MeshInstance3D" parent="World/Characters/Enemy" unique_id=468852842]
@@ -104,6 +107,11 @@ script = ExtResource("1_uwrxv")
 [node name="TestObstacle" type="MeshInstance3D" parent="World/Grid" unique_id=2006926734]
 mesh = SubResource("BoxMesh_usrgj")
 script = ExtResource("3_iywne")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="World/Grid/TestObstacle" unique_id=2123069570]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="World/Grid/TestObstacle/StaticBody3D" unique_id=999462789]
+shape = SubResource("BoxShape3D_obstacle")
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=2025753590]
 

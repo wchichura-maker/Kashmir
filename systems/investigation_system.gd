@@ -249,12 +249,39 @@ func start_investigation(
 	target.state = InvestigationState.MOVING_TO_SOUND
 	target.search_turns_elapsed = 0
 
+	var path: Array[Vector2i] = movement_system.find_investigation_path(
+		listener.grid_position,
+		target.center_cell
+	)
+
+	if path.is_empty():
+		print(
+			"InvestigationSystem: %s não encontrou caminho até o som."
+			% listener.name
+		)
+
+		target.state = InvestigationState.SEARCHING
+		return false
+
 	print(
 		"InvestigationSystem: %s iniciou investigação | centro=%s | origem=%s | estado=%s"
 		% [
 			listener.name,
 			str(target.center_cell),
 			str(target.origin_cell),
+			InvestigationState.keys()[target.state]
+		]
+	)
+
+	await listener.move_along_path(path)
+
+	target.state = InvestigationState.SEARCHING
+
+	print(
+		"InvestigationSystem: %s chegou à área do som | célula=%s | estado=%s"
+		% [
+			listener.name,
+			str(listener.grid_position),
 			InvestigationState.keys()[target.state]
 		]
 	)

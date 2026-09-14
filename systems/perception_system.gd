@@ -168,12 +168,12 @@ func get_sound_perception(
 	if not perception_results.has(listener_id):
 		return null
 
-	var sound_perceptions: Dictionary = perception_results[listener_id]
+	var listener_sound_perceptions: Dictionary = sound_perceptions[listener_id]
 
 	if not sound_perceptions.has(source_id):
 		return null
 
-	return sound_perceptions[source_id] as SoundPerception
+	return listener_sound_perceptions[source_id] as SoundPerception
 
 func get_distance_feet(
 	source: CharacterEntity,
@@ -610,14 +610,22 @@ func has_line_of_sight(
 	var space_state := get_world_3d().direct_space_state
 
 	var query := PhysicsRayQueryParameters3D.create(
-		source.global_position + Vector3(0.0, 0.75, 0.0),
-		target.global_position + Vector3(0.0, 0.75, 0.0)
+		source.global_position + Vector3(0.0, 0.60, 0.0),
+		target.global_position + Vector3(0.0, 0.60, 0.0)
 	)
 
 	query.collide_with_areas = false
 	query.collide_with_bodies = true
 
 	var result := space_state.intersect_ray(query)
+
+	print(
+		"LOS Ray Debug | collider=%s | position=%s"
+		% [
+			str(result.get("collider")),
+			str(result.get("position"))
+		]
+	)
 
 	if result.is_empty():
 		return true
